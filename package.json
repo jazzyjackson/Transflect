@@ -1,0 +1,29 @@
+{
+  "name": "transflect",
+  "version": "0.1.0",
+  "description": "Transflect request streams into response streams - bounce bad requests and surface internal errors",
+  "main": "traflect.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jazzyjackson/transflect.git"
+  },
+  "keywords": [
+    "Transform",
+    "Stream",
+    "transform",
+    "http",
+    "error",
+    "handling",
+    "pipe",
+    "pipeline"
+  ],
+  "author": "Colten Jackson",
+  "license": "SEE LICENSE IN CONTINUITY.LICENSE",
+  "bugs": {
+    "url": "https://github.com/jazzyjackson/transflect/issues"
+  },
+  "homepage": "https://github.com/jazzyjackson/transflect#readme"
+}
