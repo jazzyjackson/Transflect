@@ -1,8 +1,8 @@
 {
-  "name": "transflect",
+  "name": "@mixint/transflect",
   "version": "0.1.0",
   "description": "Transflect request streams into response streams - bounce bad requests and surface internal errors",
-  "main": "traflect.js",
+  "main": "transflect.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -11,8 +11,7 @@
     "url": "git+https://github.com/jazzyjackson/transflect.git"
   },
   "keywords": [
-    "Transform",
-    "Stream",
+    "stream",
     "transform",
     "http",
     "error",
