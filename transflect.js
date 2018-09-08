@@ -1,60 +1,55 @@
-const {Transform} = require('stream')
-const url = require('url')
-const querystring = require('querystring')
-let i = 0
-
-module.exports = class Transflect extends Transform {
-    constructor({req, res}){
-        super()
-        this.on('error', this.failVerbose)
-        this.on('close', res.end.bind(res))
-        Object.assign(this, {req, res})
-        //error is thrown when transform or destroy's callback has err in first argument
+module.exports = class Transflect extends require('stream').PassThrough {
+    constructor(options){
+        super(options)
+        this.readable = false // response only writes head AFTER receiving first chunk
+        this._headers = {}
+        this.on('pipe', source => {
+            this._openStreams = [].concat(
+                this._open(this.source = source)
+            ).filter(each =>
+                each instanceof stream // filter undefined return values and prevent calling destroy on invalid return values
+            ).map(stream =>
+                stream.once('error', err => this.destroy(err))
+            )
+        }).on('error', err => this.destroyed || this.destory(err))
     }
 
-    failVerbose(err){
-        this.res.headersSent || this.res.setHeader('Content-Type', 'application/json')
-        this.res.headersSent || this.res.writeHead(
-            err && err.code == 'ENOENT' ? 404 : // error no entity
-            err && err.code == 'ERANGE' ? 416 : // range not satisfiable
-            err && err.code == 'EACCES' ? 423 : // error no access
-        /* if error reason not provided*/ 500 )
-        this.res.end(JSON.stringify({
-          error: err,
-          request: this.headers,
-          url: this.url,
-          versions: process.versions,
-          platform: process.platform,
-        }))
-    }
-    // _flush & _transform should be overwritten by subclasses!
-    _flush(done){
-        done(new Error('Transflection'))
+
+    _open(source){
+        // overwrite this function ! return any streams that need to be destroyed in event of failure on destination
     }
 
-    _transform(chunk, encoding, done){
-        done(null)
-    }
-
-    get started(){
-        return this.res.headersSent
-    }
-
-    // ideally subclasses can live without knowing about underlying req and res objects...
-    set headers(newHeaderObject){
-        for(var key in newHeaderObject){
-            this.res.setHeader(key, newHeaderObject[key])
+    _destroy(err){
+        this.emit('error', err)
+        while(this._openStreams.length){
+            this._openStreams.pop().destroy()
         }
     }
+
+    setHeader(header, value){
+        if(this._headers){
+            this._headers[header] = value
+        } else {
+            this._headers = {[header]: value}
+        }
+    }
+
     get headers(){
-        return this.req.headers
+        return this._headers || {}
     }
 
-    get url(){
-        return url.parse(this.req.url)
+    get pipes(){
+        return this._readableState.pipes
     }
 
-    get query(){
-        return querystring.parse(this.url.query)
+    writeHead(statusCode, headers){
+        // these properties get read by ServerFailSoft as soon as any bytes are written to destination
+        // maybe it would be useful to throw an error if writeHead is called after bytes are sent?
+        // otherwise you might wonder why nothing happens when this is called.
+        if(this.pipes.headersSent) return this.emit('err', "Can't set headers after they're sent.")
+        this.statusCode = statusCode
+        for(var header in headers){
+            this.setHeader(header, headers[header])
+        }
     }
 }
