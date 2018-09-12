@@ -5,8 +5,9 @@ license: Continuity
 version: 1.0.0
 ...
 **/
+let stream = require('stream')
 
-module.exports = class Transflect extends require('stream').Transform {
+module.exports = class Transflect extends stream.Transform {
     constructor(options){
         super(options)
         this.readable = false
