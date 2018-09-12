@@ -1,6 +1,6 @@
 {
   "name": "@mixint/transflect",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Transflect request streams into response streams - bounce bad requests and surface internal errors",
   "main": "transflect.js",
   "scripts": {
