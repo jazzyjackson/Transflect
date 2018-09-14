@@ -1,7 +1,7 @@
 {
   "name": "@mixint/transflect",
   "version": "0.2.1",
-  "description": "Transflect request streams into response streams - bounce bad requests and surface internal errors",
+  "description": "An extensible transform stream to write servers around",
   "main": "transflect.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -22,11 +22,11 @@
   "author": "Colten Jackson",
   "license": "SEE LICENSE IN CONTINUITY.LICENSE",
   "bugs": {
-    "url": "https://github.com/jazzyjackson/transflect/issues"
+    "url": "https://github.com/mixint/transflect/issues"
   },
-  "homepage": "https://github.com/jazzyjackson/transflect#readme",
+  "homepage": "https://github.com/mixint/transflect#readme",
   "dependencies": {
-    "parsedmessage": "^0.2.0",
+    "parsedmessage": "^2.0.0",
     "serverfailsoft": "^1.1.0"
   }
 }
