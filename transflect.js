@@ -18,19 +18,21 @@ module.exports = class Transflect extends stream.Transform {
      */
     constructor(options){
         super(options)
-        this.once('pipe', source => {
+        /* calling destroy without error closes and destroys any streams in the ._openStreams array */
+        this.on('end', () => {
+            // not 100% sure this is necessary, streams seem to close themselves so far, needs some tests.
+            this.destroyed || this.destroy()
+        }).on('error', error => {
+            this.destroyed || this.destroy(error)
+        }).once('pipe', source => {
             this._openStreams = [].concat(
                 this._open(this.source = source)
             ).filter(each =>
                 each instanceof stream // filter undefined return values and prevent calling destroy on invalid return values
             ).map(each =>
                 each.once('error', error => this.destroy(error))
-            ).map(each =>
-                this.once('end', () => each.close && each.close())
             )
         })
-        this.on('error', error => this.destroyed || this.destroy(error))
-        this.on('end', () => this.destroy()) // destroy without error
     }
 
     /**
@@ -41,14 +43,24 @@ module.exports = class Transflect extends stream.Transform {
         /* return a stream or array of streams */
     }
 
-    /** transform is only invoked when request includes a body. If you don't intend to do anything with a body, don't overwrite this. */
+    /**
+     * @callback done
+     * transform is only invoked when request includes a body. If you don't intend to do anything with a body, don't overwrite this.
+     */
     _transform(chunk, encoding, done){
         done(new Error(`${this.constructor.name} has no transform function and cannot accept a request body.`))
     }
 
-    /** overwrite this function to conclude the response, perhaps with naught but a done(null) */
+    /**
+     * @callback done
+     * overwrite this function to conclude the response, perhaps with naught but a done(null)
+     */
     _flush(done){
-        done(new Error("You've reached Transflect. No other streams were able to respond to this call. This message is for debugging purposes."))
+        if(this.constructor.name == 'Transflect'){
+            done(new Error("You've reached Transflect. No other streams were able to respond to this call. This message is for debugging purposes."))
+        } else {
+            done(new Error(`${this.constructor.name} has no flush function to close the connection.`))
+        }
     }
 
     /**

@@ -18,10 +18,9 @@ class simpleread extends transflect {
     }
 
     _flush(done){
-        stream.pipeline(this.stream, this.pipes, done)
-        // this.stream.on('data', data => {
-        //     this.push(data) || (this.stream.pause(), this.pipes.once('drain', () => this.stream.resume()))
-        // }).on('close', done).on('error',  done)
+         this.stream.on('data', data => {
+            this.push(data) || (this.stream.pause(), this.pipes.once('drain', () => this.stream.resume()))
+        }).on('close', done).on('error',  done)
     }
 }
 
@@ -30,8 +29,18 @@ class simplewrite extends transflect {
         super(options)
     }
 
+    /**
+     * @param {ParsedMessage} source
+     * Uses IncomingMessage.base only write files in local directory
+     * .base is file basename, no directory prefix.
+     * @return {WriteStream}
+     * return newly created file writeStream so that it is closed on error or end
+     * in the event the connection is aborted before writing is finished,
+     * simplewrite does NOT delete the unfinished file, but it will close it to avoid fd leak
+     * perhaps a more sophisticated transfect would write to a /tmp/ folder and only copy to overwrite
+     * the destination once the connection is closes, to avoid destroying the original file
+     */
     _open(source){
-        // only write files in local directory, .base is file basename, no directory prefix.
         return this.dest = fs.createWriteStream(source.base) // return stream to auto-close on destroy
     }
 
