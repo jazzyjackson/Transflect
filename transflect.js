@@ -18,17 +18,19 @@ module.exports = class Transflect extends stream.Transform {
      */
     constructor(options){
         super(options)
-        this.readable = false
-        this.on('pipe', source => {
+        this.once('pipe', source => {
             this._openStreams = [].concat(
                 this._open(this.source = source)
             ).filter(each =>
                 each instanceof stream // filter undefined return values and prevent calling destroy on invalid return values
             ).map(each =>
                 each.once('error', error => this.destroy(error))
+            ).map(each =>
+                this.once('end', () => each.close && each.close())
             )
         })
         this.on('error', error => this.destroyed || this.destroy(error))
+        this.on('end', () => this.destroy()) // destroy without error
     }
 
     /**
@@ -53,9 +55,11 @@ module.exports = class Transflect extends stream.Transform {
      * DON'T overwrite _destroy unless you don't have any _openStreams to worry about! Just let me re-emit the error.
      * This gets called automatically when a value is passed to first parameter of the callback in _transform or _flush
      * But can also be called via this.destroy() anytime within the stream.
+     * Since 1.0, call this.destroy without error and no error will be emitted, all _openStreams will be 'cleaned up'
+     * OOOOhhhhh 'cleanup' is necessary because if event listeners are attached, stream can't be garbage collected, right?
      */
     _destroy(error){
-        this.emit('error', error)
+        error && this.emit('error', error)
         this._openStreams.forEach(openStream => {
             openStream.close && openStream.close()
             openStream.destroy && openStream.destroy()
@@ -64,7 +68,7 @@ module.exports = class Transflect extends stream.Transform {
 
     /**
      * @param {string} header
-     * @param {stream} value
+     * @param {string} value
      * Overwrites any existing header, creates object if it doesn't exist yet.
      */
     setHeader(header, value){
@@ -77,12 +81,14 @@ module.exports = class Transflect extends stream.Transform {
 
     /**
      * @param { number } statuscode
-     * @param { object } [headers={}]
+     * @param { object } [headers={}] - default empty obj
      * @return { undefined }
      * these properties get read by ServerFailSoft
      * as soon as any bytes are written to destination
+     * I could pass on to this.pipes.writeHead if I want to... but it won't exist synchronously
+     * so instead these properties are set locally, and pulled from ServerFailSoft on 'data','end', or 'error'
      */
-    writeHead(statusCode, headers = {} /* default empty obj */){
+    writeHead(statusCode, headers = {}){
         if(this.pipes && this.pipes.headersSent){
             this.emit('error', new Error("Can't set headers after they're sent."))
         } else {

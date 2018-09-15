@@ -1,4 +1,4 @@
-{
+                            {
   "name": "@mixint/transflect",
   "version": "0.3.0",
   "description": "An extensible transform stream to write servers around",
@@ -26,7 +26,7 @@
   },
   "homepage": "https://github.com/mixint/transflect#readme",
   "dependencies": {
-    "parsedmessage": "^2.0.0",
-    "serverfailsoft": "^1.1.0"
+    "parsedmessage": "^3.0.0",
+    "serverfailsoft": "^1.2.2"
   }
 }

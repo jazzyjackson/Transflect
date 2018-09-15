@@ -4,6 +4,7 @@ Tests will need to be written for when a stream...
 - writes to a substream and closes when its done
 - streams a substream to destination and closes when its done
 - opens a (r/w) substream and then has to respond to aborted connection
+- if this chain reaction looks any different via `stream.pipeline`
 
 Have to run apache bench tests to guard against obvious memory leaks, poll /proc/*/fds to check for obvious file descriptor leaks.
 

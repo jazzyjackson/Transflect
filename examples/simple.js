@@ -18,9 +18,10 @@ class simpleread extends transflect {
     }
 
     _flush(done){
-        this.stream.on('data', data => {
-            this.push(data) || (this.stream.pause(), this.pipes.once('drain', () => this.stream.resume()))
-        }).on('close', done).on('error',  done)
+        stream.pipeline(this.stream, this.pipes, done)
+        // this.stream.on('data', data => {
+        //     this.push(data) || (this.stream.pause(), this.pipes.once('drain', () => this.stream.resume()))
+        // }).on('close', done).on('error',  done)
     }
 }
 
