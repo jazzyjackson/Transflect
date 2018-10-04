@@ -8,19 +8,17 @@ let stream = require('stream')
 
 /**
  * @extends stream.Transform
+ * Attaches error handlers and keeps a reference to any open streams
+ * such that if a request fails, requisite streams are closed and/or destroyed
+ * hands the http.incomingStream that is being piped to
+ * transflect to the _open functions, which can then read any props off the request
  */
 module.exports = class Transflect extends stream.Transform {
-    /**
-     * Attaches error handlers and keeps a reference to any open streams
-     * such that if a request fails, requisite streams are closed and/or destroyed
-     * hands the http.incomingStream that is being piped to
-     * transflect to the _open functions, which can then read any props off the request
-     */
+
     constructor(options){
         super(options)
         /* calling destroy without error closes and destroys any streams in the ._openStreams array */
         this.on('end', () => {
-            // not 100% sure this is necessary, streams seem to close themselves so far, needs some tests.
             this.destroyed || this.destroy()
         }).on('error', error => {
             this.destroyed || this.destroy(error)
@@ -44,7 +42,6 @@ module.exports = class Transflect extends stream.Transform {
     }
 
     /**
-     * @callback done
      * transform is only invoked when request includes a body. If you don't intend to do anything with a body, don't overwrite this.
      */
     _transform(chunk, encoding, done){
@@ -52,7 +49,6 @@ module.exports = class Transflect extends stream.Transform {
     }
 
     /**
-     * @callback done
      * overwrite this function to conclude the response, perhaps with naught but a done(null)
      */
     _flush(done){

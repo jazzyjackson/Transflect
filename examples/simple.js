@@ -8,19 +8,34 @@ Object.assign(global, {
 })
 
 class simpleread extends transflect {
-    constructor(options){
-        super(options)
-    }
+    constructor(){super()}
 
     _open(source){
-        // only serves files in local directory, .base is file basename, no directory prefix
-        return this.stream = fs.createReadStream(source.base) // readstream closes itself on end
+        return this.stream = fs.createReadStream(source.pathname)
     }
 
     _flush(done){
          this.stream.on('data', data => {
             this.push(data) || (this.stream.pause(), this.pipes.once('drain', () => this.stream.resume()))
         }).on('close', done).on('error',  done)
+    }
+}
+
+/**
+ * REQUIRES NODES ^10.10.0
+ * Uses withFileTypes and dirEnt.isDirectory() to append a trailing slash
+ */
+class simplelist extends transflect {
+    constructor(){super()}
+
+    _flush(done){
+        fs.readdir(this.source.pathname, {withFileTypes: true}, (error, files) => {
+            done(error, files && files.map(dirent => {
+                let isDirectory = dirent.isDirectory()
+                let filename = dirent.name
+                return `<div><a href="${this.source.pathname}${filename}${isDirectory ? '/' : ''}">${filename}</a></div>`
+            }).join('\n'))
+        })
     }
 }
 
@@ -71,16 +86,15 @@ class simpleunlink extends transflect {
     }
 }
 
-let options = {
+http.createServer({
     IncomingMessage: require('parsedmessage'),
     ServerResponse: require('serverfailsoft')
-}
-
-http.createServer(options, (req,res) => (route => {
+}, (req,res) => (route => {
     req.pipe(new route).pipe(res)
 })(
-    req.method == 'GET'    ? simpleread   :
-    req.method == 'PUT'    ? simplewrite  :
-    req.method == 'DELETE' ? simpleunlink :
-    /* if no route ... */    transflect
+    req.pathname.slice(-1) == '/' ? simplelist   :
+    req.method == 'GET'           ? simpleread   :
+    req.method == 'PUT'           ? simplewrite  :
+    req.method == 'DELETE'        ? simpleunlink :
+    /* if no route ... */           transflect
 )).listen(3000)
