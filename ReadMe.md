@@ -2,7 +2,7 @@
 
 Transflect is a base class for a new kind of webserver called a Transflection Server which allows you to `request.pipe(transflect).pipe(response)`.
 
-This class on its own does nothing but throw a kind of `NotImplemented` error which makes it useful as a fallback response. Transflection servers using (ServerFailSoft)[] will return an informative error response as JSON. 
+This class on its own does nothing but throw a kind of `NotImplemented` error which makes it useful as a fallback response. Transflection servers using [ServerFailSoft](http://github.com/jazzyjackson/serverfailsoft/) will return an informative error response as JSON. 
 
 ## Methods available to child classes
 
@@ -18,9 +18,66 @@ Besides these, Transflect and ServerFailSoft work in conjunction to give you `se
 
 ## Example
 
-After running `npm i`, Check out the examples/simple.js source for a few basic examples for extending this class into your own behavior. You can implement a simple server that routes each request to an appropriate extension of transflect and pipes bytes in one end and out the other. In this example, if the incoming request's pathname ends in a trailing slash, it's presumed to be a request to list the directory. Otherwise, if it's a GET request, it will try to read the file. PUT requets can write files to disk, and DELETE requests can delete files (any file the server's euid has permission to delete). If your request doesn't match any of these conditions (like an OPTIONS request not ending in a trailing slash), your request is handled by the base class provided here in transflect.js.
+After running `npm i`, you can run `node examples/simple.js` and point your browser to `localhost:3000` to browse your filesystem in a traditional sort of sitemap. A request ending with a trailing slash is directed to a transflect stream provided here to create a directory listing and render some html that is returned once readdir is finished. (Requires NodeJS 10.10 for that sweet `withFileTypes` option). No incoming bytes are expected, and no underlying streams are opened, so the optional `_open()` and `_transform()` are left out.
 
-Try it out with `node examples/simple.js` and open `localhost:3000` in your browser.
+```js
+class simplelist extends transflect {
+    constructor(){ super() }
+
+    _flush(done){
+        fs.readdir(this.source.pathname, {withFileTypes: true}, (error, files) => {
+            done(error, files && files.map(dirent => {
+                let isDirectory = dirent.isDirectory()
+                let filename = dirent.name
+                return `<div><a href="${this.source.pathname}${filename}${isDirectory ? '/' : ''}">${filename}</a></div>`
+            }).join('\n'))
+        })
+    }
+}
+```
+
+How about an example of opening a writestream to pipe incoming bodies to? 
+
+In this case we implement `_open` to create a `this.dest` property as soon as a request is piped and **return** a reference to this stream so it may be closed if an error is thrown during the response, avoiding file descriptor leaks.
+
+Incoming bytes must be consumed by the `_transform` implementation, and we write them to the stream created in the call to `_open`. We must be careful to respect backpressure here, so we only call done when write returns true.
+
+Once all bytes are consumed, we can set a statusCode and finish. Note we can set statusCode during the flush here because no bytes have been sent this whole time - transform consumed them without passing anything to done().
+
+```js
+class simplewrite extends transflect {
+    constructor(){ super() }
+
+    _open(source){
+        return this.dest = fs.createWriteStream(source.pathname)
+    }
+
+    _transform(chunk, encoding, done){
+        this.dest.write(chunk) && done() || this.dest.once('drain', done)
+    }
+
+    _flush(done){
+        this.statusCode = 201 // 201 created
+        done()
+    }
+}
+```
+
+Look into `examples/simple.js` for more comments and implementation of simpleread and simpleunlink. 
+
+More sophisticated versions of these example streams are provided as separate modules:
+
+- ContextFeed: provides realtime updates of file changes
+- PathRead
+- PathWrite
+- PathUnlink
+
+More Transflect modules include:
+- PathFork: get output or error of child process as JSON response
+- TeleFork: launch child processes and get realtime progress
+- BytePipette: read byte ranges from files, stream media, tail logs
+- WritePipette: write byte ranges, append bytes to files
+- FigjamFeed: bundle customElement scripts with HTML views
 
 ```js
 http.createServer(options, (req,res) => (route => {
