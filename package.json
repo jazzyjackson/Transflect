@@ -26,7 +26,8 @@
   },
   "homepage": "https://github.com/mixint/transflect#readme",
   "dependencies": {
-    "parsedmessage": "^3.0.1",
-    "serverfailsoft": "^1.2.3"
+    "parsedmessage": "3.0.1",
+    "serverfailsoft": "2.0.0",
+    "streamverbose": "0.2.1"
   }
 }

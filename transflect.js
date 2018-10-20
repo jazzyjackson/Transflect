@@ -4,7 +4,7 @@ author: Colten Jackson
 license: Continuity
 ...
 **/
-let stream = require('stream')
+const stream = require('stream')
 
 /**
  * @extends stream.Transform
@@ -15,47 +15,77 @@ let stream = require('stream')
  */
 module.exports = class Transflect extends stream.Transform {
 
-    constructor(options){
-        super(options)
-        /* calling destroy without error closes and destroys any streams in the ._openStreams array */
-        this.on('end', () => {
-            this.destroyed || this.destroy()
+    constructor(){
+        super()
+        this.openStreams = new Array
+        /* calling destroy without error closes and destroys any streams in the .openStreams array */
+        this.once('pipe', source => {
+            this.open(source)
         }).on('error', error => {
             this.destroyed || this.destroy(error)
-        }).once('pipe', source => {
-            this._openStreams = [].concat(
+        }).on('end', () => {
+            this.destroyed || this.destroy()
+        })
+    }
+
+    /**
+     * _open, _transflect, and _end 
+     * @param {http.IncomingMessage} source
+     * overwrite this function ! return any streams that need to be destroyed in event of failure on destination
+     */
+    _open(source){
+        return [] /* return a stream or array of streams */
+    }
+
+    _transflect(data, done){
+        done(new Error(`${this.constructor.name} has no transform function and cannot accept a request body.`))
+    }
+
+    _end(done){
+        if(this.constructor.name == 'Transflect'){
+            done(new Error("You've reached Transflect. No other streams were able to respond to this call. This message is for debugging purposes."))
+        } else {
+            done(new Error(`${this.constructor.name} has no flush function to close the connection.`))
+        }
+    }
+
+    /**
+     * Uses [].concat() because I get an array whether concat receives a single stream or an array of streams.
+     */ 
+    open(source){
+        try {
+            this.openStreams = this.openStreams.concat(
                 this._open(this.source = source)
             ).filter(each =>
                 each instanceof stream // filter undefined return values and prevent calling destroy on invalid return values
             ).map(each =>
                 each.once('error', error => this.destroy(error))
             )
-        })
-    }
-
-    /**
-     * @param {http.IncomingMessage} source
-     * overwrite this function ! return any streams that need to be destroyed in event of failure on destination
-     */
-    _open(source){
-        /* return a stream or array of streams */
+        } catch(error){
+            this.destroyed || this.destroy(error)
+        }
+  
     }
 
     /**
      * transform is only invoked when request includes a body. If you don't intend to do anything with a body, don't overwrite this.
      */
     _transform(chunk, encoding, done){
-        done(new Error(`${this.constructor.name} has no transform function and cannot accept a request body.`))
+        try {
+            this._transflect(chunk, done)
+        } catch(error){
+            this.destroyed || this.destroy(error)
+        }
     }
 
     /**
      * overwrite this function to conclude the response, perhaps with naught but a done(null)
      */
     _flush(done){
-        if(this.constructor.name == 'Transflect'){
-            done(new Error("You've reached Transflect. No other streams were able to respond to this call. This message is for debugging purposes."))
-        } else {
-            done(new Error(`${this.constructor.name} has no flush function to close the connection.`))
+        try {
+            this._end(done)
+        } catch(error){
+            this.destroyed || this.destroy(error)
         }
     }
 
@@ -67,57 +97,18 @@ module.exports = class Transflect extends stream.Transform {
      * OOOOhhhhh 'cleanup' is necessary because if event listeners are attached, stream can't be garbage collected, right?
      */
     _destroy(error){
-        error && this.emit('error', error)
-        this._openStreams.forEach(openStream => {
+        error && process.nextTick(()=>{
+            this.emit('error', error)
+        })
+        this.openStreams.forEach(openStream => {
             openStream.close && openStream.close()
             openStream.destroy && openStream.destroy()
         })
     }
 
     /**
-     * @param {string} header
-     * @param {string} value
-     * Overwrites any existing header, creates object if it doesn't exist yet.
-     */
-    setHeader(header, value){
-        if(this._headers){
-            this._headers[header] = value
-        } else {
-            this._headers = {[header]: value}
-        }
-    }
-
-    /**
-     * @param { number } statuscode
-     * @param { object } [headers={}] - default empty obj
-     * @return { undefined }
-     * these properties get read by ServerFailSoft
-     * as soon as any bytes are written to destination
-     * I could pass on to this.pipes.writeHead if I want to... but it won't exist synchronously
-     * so instead these properties are set locally, and pulled from ServerFailSoft on 'data','end', or 'error'
-     */
-    writeHead(statusCode, headers = {}){
-        if(this.pipes && this.pipes.headersSent){
-            this.emit('error', new Error("Can't set headers after they're sent."))
-        } else {
-            this.statusCode = statusCode
-            for(var header in headers){
-                this.setHeader(header, headers[header])
-            }
-        }
-    }
-
-    /**
-     * @return {object}
-     */
-    get headers(){
-        return this._headers || {}
-    }
-
-    /**
-     * @return {(stream|array)}
+     * @return {(stream)}
      * I only ever expect to have one destiantion stream
-     * otherwise this would return an array of pipes which may surprise you
      */
     get pipes(){
         return this._readableState.pipes

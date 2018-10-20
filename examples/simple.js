@@ -4,18 +4,22 @@ Object.assign(global, {
     url: require('url'),
     path: require('path'),
     stream: require('stream'),
-    transflect: require('../transflect')
+    transflect: require('../transflect'),
+    EventSeries: require('streamverbose').EventSeries,
+    es2column: require('streamverbose').es2column,
 })
 
+process.on('warning', e => console.warn(e.stack));
+
 class simpleread extends transflect {
-    constructor(){super()}
+    constructor(){ super() }
 
     _open(source){
         return this.stream = fs.createReadStream(source.pathname)
     }
 
-    _flush(done){
-         this.stream.on('data', data => {
+    _end(done){        
+        this.stream.on('data', data => {
             this.push(data) || (this.stream.pause(), this.pipes.once('drain', () => this.stream.resume()))
         }).on('close', done).on('error',  done)
     }
@@ -26,9 +30,9 @@ class simpleread extends transflect {
  * Uses withFileTypes and dirEnt.isDirectory() to append a trailing slash
  */
 class simplelist extends transflect {
-    constructor(){super()}
+    constructor(){ super() }
 
-    _flush(done){
+    _end(done){
         fs.readdir(this.source.pathname, {withFileTypes: true}, (error, files) => {
             done(error, files && files.map(dirent => {
                 let isDirectory = dirent.isDirectory()
@@ -40,14 +44,10 @@ class simplelist extends transflect {
 }
 
 class simplewrite extends transflect {
-    constructor(options){
-        super(options)
-    }
+    constructor(){ super() }
 
     /**
      * @param {ParsedMessage} source
-     * Uses IncomingMessage.base only write files in local directory
-     * .base is file basename, no directory prefix.
      * @return {WriteStream}
      * return newly created file writeStream so that it is closed on error or end
      * in the event the connection is aborted before writing is finished,
@@ -56,39 +56,40 @@ class simplewrite extends transflect {
      * the destination once the connection is closes, to avoid destroying the original file
      */
     _open(source){
-        return this.dest = fs.createWriteStream(source.base) // return stream to auto-close on destroy
+        return this.dest = fs.createWriteStream(source.pathname) // return stream to auto-close on destroy
     }
 
-    _transform(chunk, encoding, done){
-        this.dest.write(chunk) && done() || this.dest.once('drain', done)
+    _transflect(data, done){
+        this.dest.write(data) && done() || this.dest.once('drain', done)
     }
 
-    _flush(done){
-        this.statusCode = 201 // 201 created
+    _end(done){
+        // if we've got this far without throwing an error we're home free
+        this.pipes.statusCode = 201 // 201 created
         done()
     }
 }
 
 class simpleunlink extends transflect {
-    constructor(options){
-        super(options)
-    }
+    constructor(){ super() }
 
     // no need to _open(source) a stream here, source is available as this.source
 
-    _flush(done){
+    _end(done){
         // if unlink throws an error, it is passed to done,
         // thrown by _flush and caught by ServerFailSoft
-        this.statusCode = 204
         // 204 finished delete, no content to return
         // will be overrided if unlink throws an error
+        this.pipes.statusCode = 204
         fs.unlink(this.source.base, done)
     }
 }
 
 http.createServer({
+
     IncomingMessage: require('parsedmessage'),
     ServerResponse: require('serverfailsoft')
+
 }, (req,res) => (route => {
     req.pipe(new route).pipe(res)
 })(
