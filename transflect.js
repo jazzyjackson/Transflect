@@ -38,14 +38,14 @@ module.exports = class Transflect extends stream.Transform {
     }
 
     _transflect(data, done){
-        done(new Error(`${this.constructor.name} has no transform function and cannot accept a request body.`))
+        done(new Error(`${this.constructor.name} has no _transflect function and cannot accept a request body.`))
     }
 
     _end(done){
         if(this.constructor.name == 'Transflect'){
             done(new Error("You've reached Transflect. No other streams were able to respond to this call. This message is for debugging purposes."))
         } else {
-            done(new Error(`${this.constructor.name} has no flush function to close the connection.`))
+            done(new Error(`${this.constructor.name} has no _end function to close the connection.`))
         }
     }
 

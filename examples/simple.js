@@ -62,9 +62,9 @@ class simplewrite extends transflect {
     _transflect(data, done){
         this.dest.write(data) && done() || this.dest.once('drain', done)
     }
-
+    
+    /* if we've got this far without throwing an error we're home free */
     _end(done){
-        // if we've got this far without throwing an error we're home free
         this.pipes.statusCode = 201 // 201 created
         done()
     }
@@ -73,13 +73,16 @@ class simplewrite extends transflect {
 class simpleunlink extends transflect {
     constructor(){ super() }
 
-    // no need to _open(source) a stream here, source is available as this.source
-
+    /**
+     * no need to _open(source) a stream here, 
+     * source is available as this.source
+     *
+     * if unlink throws an error, it is passed to done,
+     * thrown by _flush and caught by ServerFailSoft
+     * 204 finished delete, no content to return
+     * will be overrided if unlink throws an error
+     */
     _end(done){
-        // if unlink throws an error, it is passed to done,
-        // thrown by _flush and caught by ServerFailSoft
-        // 204 finished delete, no content to return
-        // will be overrided if unlink throws an error
         this.pipes.statusCode = 204
         fs.unlink(this.source.base, done)
     }

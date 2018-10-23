@@ -14,7 +14,7 @@ Transflect provides a scaffold to write your own transform streams. Extensions o
 
 `_end(done) //required`: You have to overwrite this function at least by simply calling `done(null)` if nothing more needs doing. This will be called nearly immediately if the `IncomingRequest` has no body. If you're not operating on a body your entire response will probably be constructed in the `_end` method.
 
-To set headers, use `this.pipes.writeHead` to call the method on the response object.
+To set headers, use `this.pipes.statusCode` and `this.pipes.writeHead` to call the method on the response object - but you can't do this in `_open()` since this is called before the destination is piped to.
 
 ## Example
 
