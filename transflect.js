@@ -17,9 +17,8 @@ module.exports = class Transflect extends stream.Transform {
 
     constructor(){
         super()
-        /* calling destroy without error closes and destroys any streams in the .openStreams array */
         this.once('pipe', source => {
-            this.source = source
+            this.source = source // source is ParsedMessage / http.IncomingMessage
         }).on('error', error => {
             this.destroyed || this.destroy(error)
         }).on('end', () => {
@@ -28,18 +27,28 @@ module.exports = class Transflect extends stream.Transform {
     }
 
     /**
-     * _open, _transflect, and _end 
      * @param {http.IncomingMessage} source
-     * overwrite this function ! return any streams that need to be destroyed in event of failure on destination
+     * @return {(stream|Array|undefined)}
+     * optional: overwrite _open(): return any streams that need to be destroyed in event of failure on destination
      */
     _open(source){
         return [] /* return a stream or array of streams */
     }
 
+    /**
+     * @param {(String|Buffer)} data
+     * @param {Function} done
+     * optional: overwrite _transflect(): return any streams that need to be destroyed in event of failure on destination
+     * _transflect() is called on the HTTP request's body. No body, nothing to transflect.
+     * If a body is included and you haven't overwritten this function, the client gets a 500 error with the error message:
+     */
     _transflect(data, done){
         done(new Error(`${this.constructor.name} has no _transflect function and cannot accept a request body.`))
     }
 
+    /**
+     * @param {Function} done
+     */
     _end(done){
         if(this.constructor.name == 'Transflect'){
             done(new Error("You've reached Transflect. No other streams were able to respond to this call. This message is for debugging purposes."))
@@ -49,7 +58,7 @@ module.exports = class Transflect extends stream.Transform {
     }
 
     /**
-     * Uses [].concat() because I get an array whether concat receives a single stream or an array of streams.
+     * Uses [].concat() because it retuns an array whether concat receives a single stream or an array of streams.
      */ 
     open(){
         this.openStreams = []
@@ -59,7 +68,14 @@ module.exports = class Transflect extends stream.Transform {
     }
 
     /**
-     * transform is only invoked when request includes a body. If you don't intend to do anything with a body, don't overwrite this.
+     * _transform and _flush are overwritten here in order to extend stream.Transform
+     * In each case, I check if this.open was called (an array of any length will return true)
+     * and if not, call this.open, which calls your own implementation of ._open(source)
+     *
+     * This is wrapped in setTimeout(()=>try{}catch(){}) in order to pass any 
+     * sync or async error back to client. 
+     * try{}catch{} will pass a synchronous error to be emitted by this stream
+     * setTimeout will be 
      */
     _transform(chunk, encoding, done){
         setTimeout(()=>{
@@ -72,9 +88,6 @@ module.exports = class Transflect extends stream.Transform {
         })
     }
 
-    /**
-     * overwrite this function to conclude the response, perhaps with naught but a done(null)
-     */
     _flush(done){
         setTimeout(()=>{
             try {
@@ -87,11 +100,10 @@ module.exports = class Transflect extends stream.Transform {
     }
 
     /**
-     * DON'T overwrite _destroy unless you don't have any _openStreams to worry about! Just let me re-emit the error.
-     * This gets called automatically when a value is passed to first parameter of the callback in _transform or _flush
-     * But can also be called via this.destroy() anytime within the stream.
-     * Since 1.0, call this.destroy without error and no error will be emitted, all _openStreams will be 'cleaned up'
-     * OOOOhhhhh 'cleanup' is necessary because if event listeners are attached, stream can't be garbage collected, right?
+     * Whether an error originates from this.destroy being called explitictly or 
+     * from passing a first parameter to 'done' in _transflect or _end.
+     *
+     * I don't know how to test that the openStreams are garbage-collectable, do I have to implement a cleanup() ?
      */
     _destroy(error){
         error && this.emit('error', error)
@@ -103,8 +115,8 @@ module.exports = class Transflect extends stream.Transform {
     }
 
     /**
-     * @return {(stream)}
-     * I only ever expect to have one destiantion stream
+     * @return {http.ServerResponse}
+     * I only ever expect to have one destiantion stream, throw if there's an array.
      */
     get pipes(){
         if(Array.isArray(this._readableState.pipes))
