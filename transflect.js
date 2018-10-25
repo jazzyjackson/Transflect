@@ -17,10 +17,9 @@ module.exports = class Transflect extends stream.Transform {
 
     constructor(){
         super()
-        this.openStreams = new Array
         /* calling destroy without error closes and destroys any streams in the .openStreams array */
         this.once('pipe', source => {
-            this.open(source)
+            this.source = source
         }).on('error', error => {
             this.destroyed || this.destroy(error)
         }).on('end', () => {
@@ -52,41 +51,39 @@ module.exports = class Transflect extends stream.Transform {
     /**
      * Uses [].concat() because I get an array whether concat receives a single stream or an array of streams.
      */ 
-    open(source){
-        try {
-            this.openStreams = this.openStreams.concat(
-                this._open(this.source = source)
-            ).filter(each =>
-                each instanceof stream // filter undefined return values and prevent calling destroy on invalid return values
-            ).map(each =>
-                each.once('error', error => this.destroy(error))
-            )
-        } catch(error){
-            this.destroyed || this.destroy(error)
-        }
-  
+    open(){
+        this.openStreams = []
+            .concat(this._open(this.source))
+            .filter(each => each instanceof stream)
+            .map(each => each.once('error', error => this.destroy(error)))
     }
 
     /**
      * transform is only invoked when request includes a body. If you don't intend to do anything with a body, don't overwrite this.
      */
     _transform(chunk, encoding, done){
-        try {
-            this._transflect(chunk, done)
-        } catch(error){
-            this.destroyed || this.destroy(error)
-        }
+        setTimeout(()=>{
+            try {
+                this.openStreams || this.open()
+                this._transflect(chunk, done)
+            } catch(error){
+                this.destroyed || this.destroy(error)
+            }
+        })
     }
 
     /**
      * overwrite this function to conclude the response, perhaps with naught but a done(null)
      */
     _flush(done){
-        try {
-            this._end(done)
-        } catch(error){
-            this.destroyed || this.destroy(error)
-        }
+        setTimeout(()=>{
+            try {
+                this.openStreams || this.open()
+                this._end(done)
+            } catch(error){
+                this.destroyed || this.destroy(error)
+            }
+        })
     }
 
     /**
@@ -97,9 +94,8 @@ module.exports = class Transflect extends stream.Transform {
      * OOOOhhhhh 'cleanup' is necessary because if event listeners are attached, stream can't be garbage collected, right?
      */
     _destroy(error){
-        error && process.nextTick(()=>{
-            this.emit('error', error)
-        })
+        error && this.emit('error', error)
+
         this.openStreams.forEach(openStream => {
             openStream.close && openStream.close()
             openStream.destroy && openStream.destroy()
@@ -111,6 +107,9 @@ module.exports = class Transflect extends stream.Transform {
      * I only ever expect to have one destiantion stream
      */
     get pipes(){
-        return this._readableState.pipes
+        if(Array.isArray(this._readableState.pipes))
+            throw new Error("Cannot be piped to multiple destinations")
+        else
+            return this._readableState.pipes
     }
 }

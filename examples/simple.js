@@ -84,7 +84,7 @@ class simpleunlink extends transflect {
      */
     _end(done){
         this.pipes.statusCode = 204
-        fs.unlink(this.source.base, done)
+        fs.unlink(this.source.pathname, done)
     }
 }
 

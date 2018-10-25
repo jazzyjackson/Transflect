@@ -4,7 +4,7 @@
   "description": "An extensible transform stream to write servers around",
   "main": "Transflect.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node examples/simple.js"
   },
   "repository": {
     "type": "git",
@@ -27,7 +27,7 @@
   "homepage": "https://github.com/mixint/transflect#readme",
   "dependencies": {
     "parsedmessage": "3.0.1",
-    "serverfailsoft": "2.0.0",
+    "serverfailsoft": "2.0.2",
     "streamverbose": "0.2.1"
   }
 }
