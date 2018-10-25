@@ -75,7 +75,8 @@ module.exports = class Transflect extends stream.Transform {
      * This is wrapped in setTimeout(()=>try{}catch(){}) in order to pass any 
      * sync or async error back to client. 
      * try{}catch{} will pass a synchronous error to be emitted by this stream
-     * setTimeout will be 
+     * setTimeout will make sure any async errors emitted are handled by destination stream
+     * before trying to move on to the next byte.
      */
     _transform(chunk, encoding, done){
         setTimeout(()=>{
