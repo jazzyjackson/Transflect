@@ -5,6 +5,7 @@ license: Continuity
 ...
 **/
 const stream = require('stream')
+const fs = require('fs')
 
 /**
  * @extends stream.Transform
