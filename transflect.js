@@ -17,6 +17,8 @@ module.exports = class Transflect extends stream.Transform {
 
     constructor(){
         super()
+        this.openStreams = new Array
+
         this.once('pipe', source => {
             this.source = source // source is ParsedMessage / http.IncomingMessage
         }).on('error', error => {
@@ -60,13 +62,36 @@ module.exports = class Transflect extends stream.Transform {
     /**
      * Uses [].concat() because it retuns an array whether concat receives a single stream or an array of streams.
      */ 
-    open(){
-        this.openStreams = []
-            .concat(this._open(this.source))
-            .filter(each => each instanceof stream)
-            .map(each => each.once('error', error => this.destroy(error)))
+    open(source){
+        if(this.openPromise){
+            return this.openPromise
+        } else try {
+            this.openStreams = []
+                .concat(this._open(source))
+                .filter(each => each instanceof stream)
+                .map(each =>
+                    each.once('error', error => this.destroy(error))
+                )
+        } catch(error){
+            this.destroyed || this.destroy(error)
+        } finally {
+            if(this.openStreams.length == 0) {
+                return this.openPromise = Promise.resolve()
+            } else {
+                return this.openPromise = Promise.all(this.openStreams.map(each => 
+                    new Promise(resolve => {
+                        if(each instanceof fs.WriteStream){
+                            each.once('ready', () => resolve(each))
+                        } else if(each instanceof fs.ReadStream){
+                            each.once('ready', () => resolve(each))
+                        } else {
+                            resolve(each)
+                        }
+                    })
+                ))
+            }
+        }
     }
-
     /**
      * _transform and _flush are overwritten here in order to extend stream.Transform
      * In each case, I check if this.open was called (an array of any length will return true)
@@ -79,23 +104,21 @@ module.exports = class Transflect extends stream.Transform {
      * before trying to move on to the next byte.
      */
     _transform(chunk, encoding, done){
-        setTimeout(()=>{
+        this.open(this.source).then(() => {
             try {
-                this.openStreams || this.open()
                 this._transflect(chunk, done)
             } catch(error){
-                this.destroyed || this.destroy(error)
+                done(error)
             }
         })
     }
 
     _flush(done){
-        setTimeout(()=>{
+        this.open(this.source).then(() => {
             try {
-                this.openStreams || this.open()
                 this._end(done)
             } catch(error){
-                this.destroyed || this.destroy(error)
+                done(error)
             }
         })
     }
