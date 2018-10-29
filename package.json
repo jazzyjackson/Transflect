@@ -1,6 +1,6 @@
 {
   "name": "@mixint/transflect",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "An extensible transform stream to write servers around",
   "main": "Transflect.js",
   "scripts": {
