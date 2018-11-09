@@ -4,8 +4,10 @@ author: Colten Jackson
 license: Continuity
 ...
 **/
-const stream = require('stream')
 const fs = require('fs')
+const util = require('util')
+const debug = util.debuglog('transflect')
+const stream = require('stream')
 
 /**
  * @extends stream.Transform
@@ -22,6 +24,13 @@ module.exports = class Transflect extends stream.Transform {
 
         this.once('pipe', source => {
             this.source = source // source is ParsedMessage / http.IncomingMessage
+            debug(
+                `${this.constructor.name} has a source:\n` +
+                `Method: ${source.method}\n` +
+                `Path: ${source.pathname}\n` +
+                `Query: \n${util.inspect(source.query)}\n` +
+                `Headers: \n${util.inspect(source.headers)}\n`
+            )
         }).on('error', error => {
             this.destroyed || this.destroy(error)
         }).on('end', () => {

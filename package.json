@@ -4,7 +4,8 @@
   "description": "An extensible transform stream to write servers around",
   "main": "Transflect.js",
   "scripts": {
-    "test": "node examples/simple.js"
+    "test": "node examples/simple.js",
+    "debug": "env NODE_DEBUG=transflect node examples/simple.js"
   },
   "repository": {
     "type": "git",

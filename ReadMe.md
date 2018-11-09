@@ -18,7 +18,7 @@ To set headers, use `this.pipes.statusCode` and `this.pipes.writeHead` to call t
 
 ## Example
 
-After running `npm i`, you can run `node examples/simple.js` and point your browser to `localhost:3000` to browse your filesystem in a traditional sort of sitemap. A request ending with a trailing slash is directed to a transflect stream provided here to create a directory listing and render some html that is returned once readdir is finished. (Requires NodeJS 10.10 for that sweet `withFileTypes` option). No incoming bytes are expected, and no underlying streams are opened, so the optional `_open()` and `_transform()` are left out.
+After running `npm install`, you can run `node examples/simple.js` and point your browser to `localhost:3000` to browse your filesystem in a traditional sort of sitemap. A request ending with a trailing slash is directed to a transflect stream provided here to create a directory listing and render some html that is returned once readdir is finished. (Requires NodeJS 10.10 for that sweet `withFileTypes` option). No incoming bytes are expected, and no underlying streams are opened, so the optional `_open()` and `_transform()` are left out.
 
 ```js
 class simplelist extends transflect {
@@ -94,3 +94,10 @@ http.createServer(options, (req,res) => (route => {
 Any errors encountered (whether opening a file you don't have permission to, returning an EACCESS error, or trying to open a file that doesn't exist, resulting in a ENOENT error) will be handled by [ServerFailSoft](http://github.com/jazzyjackson/serverfailsoft/). [ParsedMessage](http://github.com/jazzyjackson/parsedmessage/) is also depended on for some convenient shortcuts to decoded pathnames.
 
 Check out examples/simple.js for details on importing the prerequisites.
+
+## Implementation
+
+NodeJS provides an API for extending Transform streams where you implement a `_transform` and optionally a `_flush` instance method to work on data. In writing a web server of the form `request.pipe(new transform).pipe(response)`, you could write your own transform stream that can access the request object (provided as the body of a `this.on('pipe')` event), consume the request body in its `_transform` method, and close the connection in the `_flush` method. You also have access to the response object as the destination stream via `this._readableState.pipes`.
+
+Transflect provides a different API in order to provide a consistent way to open other system resources that may be required to serve a request. Transform calls `_open` before processing any incoming bytes, and allows this function to return any stream objects that Transflect should wait for a `ready` event, and also may have to close/destroy in the event of an error from the stream or from the web request (eg, unexpected closed connections). It also serves to carry implementation errors back to the client (by wrapping the API in try/catch blocks and emitting the error as an event instead of crashing the program as an exception). 
+
