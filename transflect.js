@@ -74,27 +74,43 @@ module.exports = class Transflect extends stream.Transform {
      */ 
     open(source){
         if(this.openPromise){
+            debug(`existing openPromise:`, this.openPromise)
             return this.openPromise
         } else try {
             this.openStreams = []
                 .concat(this._open(source))
                 .filter(each => each instanceof stream)
                 .map(each =>
-                    each.once('error', error => this.destroy(error))
+                    each.once('error', error => {
+                        debug(`A stream returned to _open emitted an error.`)
+                        this.destroy(error)
+                    })
                 )
         } catch(error){
+            debug(`caught synchronous error on _open`)
             this.destroyed || this.destroy(error)
         } finally {
             if(this.openStreams.length == 0) {
+                debug(`no streams returned by _open, resolving`)
                 return this.openPromise = Promise.resolve()
             } else {
+                debug(`${this.openStreams.length} streams returned by _open...`)
                 return this.openPromise = Promise.all(this.openStreams.map(each => 
-                    new Promise(resolve => {
+                    new Promise((resolve, reject) => {
                         if(each instanceof fs.WriteStream){
-                            each.once('ready', () => resolve(each))
+                            debug(`a fs.WriteStream from _open`)
+                            each.once('ready', () => {
+                                debug(`a fs.WriteStream returned to _open emitted ready.`)
+                                resolve(each)
+                            })
                         } else if(each instanceof fs.ReadStream){
-                            each.once('ready', () => resolve(each))
+                            debug(`a fs.ReadStream from _open`)
+                            each.once('readable', () => {
+                                debug(`a fs.ReadStream returned to _open emitted readable.`)
+                                resolve(each)
+                            })
                         } else {
+                            debug(` an unrecognized stream from _open, resolving`)
                             resolve(each)
                         }
                     })
@@ -102,6 +118,7 @@ module.exports = class Transflect extends stream.Transform {
             }
         }
     }
+
     /**
      * _transform and _flush are overwritten here in order to extend stream.Transform
      * In each case, I check if this.open was called (an array of any length will return true)
@@ -115,6 +132,9 @@ module.exports = class Transflect extends stream.Transform {
      */
     _transform(chunk, encoding, done){
         this.open(this.source).then(() => {
+            debug(
+                `_transform called, reached body, calling this._transflect`
+            )
             try {
                 this._transflect(chunk, done)
             } catch(error){
@@ -125,6 +145,9 @@ module.exports = class Transflect extends stream.Transform {
 
     _flush(done){
         this.open(this.source).then(() => {
+            debug(
+                `_flush called, reached body, calling this._end`
+            )
             try {
                 this._end(done)
             } catch(error){
