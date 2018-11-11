@@ -53,7 +53,7 @@ class simplewrite extends transflect {
     }
 
     _transflect(data, done){
-        this.dest.write(data) && done() || this.dest.once('drain', done)
+        this.dest.write(data, done)
     }
 
     _end(done){

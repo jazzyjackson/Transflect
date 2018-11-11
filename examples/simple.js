@@ -19,9 +19,7 @@ class simpleread extends transflect {
     }
 
     _end(done){        
-        this.stream.on('data', data => {
-            this.push(data) || (this.stream.pause(), this.pipes.once('drain', () => this.stream.resume()))
-        }).on('close', done).on('error',  done)
+        this.stream.pipe(this.pipes)
     }
 }
 
@@ -60,7 +58,7 @@ class simplewrite extends transflect {
     }
 
     _transflect(data, done){
-        this.dest.write(data) && done() || this.dest.once('drain', done)
+        this.dest.write(data, done)
     }
     
     /* if we've got this far without throwing an error we're home free */
