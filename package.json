@@ -2,9 +2,10 @@
   "name": "@mixint/transflect",
   "version": "0.7.0",
   "description": "An extensible transform stream to write servers around",
-  "main": "Transflect.js",
+  "main": "transflect.js",
   "scripts": {
-    "test": "node examples/simple.js",
+    "test": "node examples/simplecallback.js",
+    "test-promise": "node examples/simplepromise.js",
     "debug": "env NODE_DEBUG=transflect node examples/simple.js"
   },
   "repository": {
