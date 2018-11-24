@@ -8,6 +8,7 @@ const fs = require('fs')
 const util = require('util')
 const debug = util.debuglog('transflect')
 const stream = require('stream')
+const events = require('events')
 
 /**
  * @extends stream.Transform
@@ -71,21 +72,18 @@ module.exports = class Transflect extends stream.Transform {
 
     /**
      * Uses [].concat() because it retuns an array whether concat receives a single stream or an array of streams.
+     * Attaches once('error', error => this.destroy(error)) in case an error is thrown after this.open() resolves.
+     *
+     * If you wanted to add a stream-kill timeout of a few seconds this would be a great place. Could possibly
+     * make an informative error of what element(s) the stream was waiting on when it his the time out.
+     * You could probably also attach a timer that watches my own streams for ' last data sent ... ' and kill idle streams
      */ 
     open(source){
         if(this.openPromise){
             debug(`existing openPromise:`, this.openPromise)
             return this.openPromise
         } else try {
-            this.openStreams = []
-                .concat(this._open(source))
-                .filter(each => each instanceof stream)
-                .map(each =>
-                    each.once('error', error => {
-                        debug(`A stream returned to _open emitted an error.`)
-                        this.destroy(error)
-                    })
-                )
+            this.openStreams = [].concat(this._open(source))
         } catch(error){
             debug(`caught synchronous error on _open`)
             this.destroyed || this.destroy(error)
@@ -94,27 +92,29 @@ module.exports = class Transflect extends stream.Transform {
                 debug(`no streams returned by _open, resolving`)
                 return this.openPromise = Promise.resolve()
             } else {
-                debug(`${this.openStreams.length} streams returned by _open...`)
-                return this.openPromise = Promise.all(this.openStreams.map(each => 
-                    new Promise((resolve, reject) => {
-                        if(each instanceof fs.WriteStream){
-                            debug(`a fs.WriteStream from _open`)
-                            each.once('ready', () => {
-                                debug(`a fs.WriteStream returned to _open emitted ready.`)
-                                resolve(each)
-                            })
-                        } else if(each instanceof fs.ReadStream){
-                            debug(`a fs.ReadStream from _open`)
-                            each.once('readable', () => {
-                                debug(`a fs.ReadStream returned to _open emitted readable.`)
-                                resolve(each)
-                            })
-                        } else {
-                            debug(` an unrecognized stream from _open, resolving`)
-                            resolve(each)
-                        }
-                    })
-                ))
+                debug(`${this.openStreams.length} promises & eventemitters returned by _open...`)
+                return this.openPromise = Promise.all(
+                    this.openStreams
+                        .filter(each => each instanceof events || each instanceof Promise)
+                        .map(each => new Promise((resolve) => {
+                            if(each instanceof Promise){
+                                debug(`${this.constructor.name} is waiting for a promise to resolve`)
+                                each.then(data => {this.push(data); resolve(data)})
+                                    .catch(error => this.destroy(error))
+                            } else if(each instanceof fs.WriteStream){
+                                debug(`${this.constructor.name} is waiting for a writestream to open`)
+                                each.once('ready', () => resolve(each))
+                                    .once('error', error => this.destroy(error))
+                            } else if(each instanceof fs.ReadStream){
+                                debug(`${this.constructor.name} is waiting for a readstream to open`)
+                                each.once('readable', () => resolve(each))
+                                    .once('error', error => this.destroy(error))
+                            } else {
+                                resolve(each.once('error', error => this.destroy(error)))
+                            }
+                        })
+                    )
+                )
             }
         }
     }
@@ -130,13 +130,18 @@ module.exports = class Transflect extends stream.Transform {
      * setTimeout will make sure any async errors emitted are handled by destination stream
      * before trying to move on to the next byte.
      */
+
     _transform(chunk, encoding, done){
         this.open(this.source).then(() => {
             debug(
                 `_transform called, reached body, calling this._transflect`
             )
             try {
-                this._transflect(chunk, done)
+                let transflection = this._transflect(chunk, done)
+                if(transflection instanceof Promise){
+                    transflection.then(data => done(null, data))
+                    transflection.catch(err => done(err))
+                }
             } catch(error){
                 done(error)
             }
@@ -149,7 +154,11 @@ module.exports = class Transflect extends stream.Transform {
                 `_flush called, reached body, calling this._end`
             )
             try {
-                this._end(done)
+                let flushing = this._end(done)
+                if(flushing instanceof Promise){
+                    flushing.then(data => done(null, data))
+                    flushing.catch(err => done(err))
+                }
             } catch(error){
                 done(error)
             }
@@ -163,8 +172,10 @@ module.exports = class Transflect extends stream.Transform {
      * I don't know how to test that the openStreams are garbage-collectable, do I have to implement a cleanup() ?
      */
     _destroy(error){
+        debug(
+            `destroy called, re-emitting error`
+        )
         error && this.emit('error', error)
-
         this.openStreams.forEach(openStream => {
             openStream.close && openStream.close()
             openStream.destroy && openStream.destroy()

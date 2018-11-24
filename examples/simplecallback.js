@@ -14,6 +14,8 @@ process.on('warning', e => console.warn(e.stack));
 class simpleread extends transflect {
     constructor(){ super() }
 
+    // if read is a directory it would be nice to redirect to pathname + '/'
+
     _open(source){
         return this.stream = fs.createReadStream(source.pathname)
     }
@@ -32,6 +34,7 @@ class simplelist extends transflect {
 
     _end(done){
         fs.readdir(this.source.pathname, {withFileTypes: true}, (error, files) => {
+            // if(this.source.headers.accept.includes('application/json')) -> concatenate to JSON response
             done(error, files && files.map(dirent => {
                 let isDirectory = dirent.isDirectory()
                 let filename = dirent.name
@@ -62,6 +65,9 @@ class simplewrite extends transflect {
     }
     
     /* if we've got this far without throwing an error we're home free */
+    // TODO this returns a Content-Length 0, well the response body is empty.
+    // I've been thinking that content-length and hash could be returned.
+    // This would be useful to copy the File API used in npm formidable
     _end(done){
         this.pipes.statusCode = 201 // 201 created
         done()
