@@ -4,9 +4,10 @@
   "description": "An extensible transform stream to write servers around",
   "main": "transflect.js",
   "scripts": {
-    "test": "node examples/simplecallback.js",
-    "test-promise": "node examples/simplepromise.js",
-    "debug": "env NODE_DEBUG=transflect node examples/simple.js"
+    "start": "node examples/simplecallback.js",
+    "start-promise": "node examples/simplepromise.js",
+    "test": "env NODE_DEBUG=transflect node examples/simplecallback.js",
+    "test-promise": "env NODE_DEBUG=transflect node examples/simplepromise.js"
   },
   "repository": {
     "type": "git",
@@ -22,14 +23,14 @@
     "pipeline"
   ],
   "author": "Colten Jackson",
-  "license": "SEE LICENSE IN CONTINUITY.LICENSE",
+  "license": "BSD-3-Clause",
   "bugs": {
     "url": "https://github.com/mixint/transflect/issues"
   },
   "homepage": "https://github.com/mixint/transflect#readme",
   "dependencies": {
-    "parsedmessage": "3.0.1",
-    "serverfailsoft": "2.0.2",
+    "parsedmessage": "3.1.0",
+    "serverfailsoft": "2.1.1",
     "streamverbose": "0.2.1"
   }
 }
