@@ -175,11 +175,12 @@ module.exports = class Transflect extends stream.Transform {
         debug(
             `destroy called, re-emitting error`
         )
+        this.openStreams
+            .filter(each => each instanceof events)
+            .forEach(openStream => {
+                openStream.destroy && openStream.destroy()
+            })
         error && this.emit('error', error)
-        this.openStreams.forEach(openStream => {
-            openStream.close && openStream.close()
-            openStream.destroy && openStream.destroy()
-        })
     }
 
     /**
