@@ -24,7 +24,7 @@ module.exports = class Transflect extends stream.Transform {
         this.openStreams = new Array
 
         this.once('pipe', source => {
-            this.source = source // source is ParsedMessage / http.IncomingMessage
+            this.source = source.once('close', () => this.destroy())
             debug(
                 `${this.constructor.name} has a source:\n` +
                 `Method: ${source.method}\n` +
@@ -173,12 +173,15 @@ module.exports = class Transflect extends stream.Transform {
      */
     _destroy(error){
         debug(
-            `destroy called, re-emitting error`
+            `destroy called ${error ? `, re-emitting error` : `without error`}\n` +
         )
         this.openStreams
             .filter(each => each instanceof events)
             .forEach(openStream => {
-                openStream.destroy && openStream.destroy()
+                if(openStream.destroy){
+                    debug(`calling destroy() on ${openStream.constructor.name}`)
+                    openStream.destroy()
+                }
             })
         error && this.emit('error', error)
     }
