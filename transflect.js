@@ -173,7 +173,7 @@ module.exports = class Transflect extends stream.Transform {
      */
     _destroy(error){
         debug(
-            `destroy called ${error ? `, re-emitting error` : `without error`}\n` +
+            `destroy called ${error ? `, re-emitting error` : `without error`}`
         )
         this.openStreams
             .filter(each => each instanceof events)
